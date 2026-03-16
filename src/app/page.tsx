@@ -1,35 +1,44 @@
 "use client"
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Monitor, Grid, LayoutPanelLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Monitor, LayoutPanelLeft } from 'lucide-react';
 
 export default function LiveMatrix() {
-  const [streams, setStreams] = useState<string[]>([]);
+  // প্রতিটি স্ট্রিমকে ইউনিক করার জন্য আমরা অবজেক্ট অ্যারে ব্যবহার করছি
+  const [streams, setStreams] = useState<{uniqueId: string, videoId: string}[]>([]);
   const [input, setInput] = useState('');
 
   // LocalStorage থেকে ভিডিও লোড করা
   useEffect(() => {
-    const saved = localStorage.getItem('_streams_v2');
+    const saved = localStorage.getItem('_streams_v3');
     if (saved) setStreams(JSON.parse(saved));
   }, []);
 
   const addStream = () => {
     let id = input.trim();
+    // ইউটিউব ইউআরএল থেকে ভিডিও আইডি বের করার রেজেক্স
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
     const match = id.match(regex);
     if (match) id = match[1];
 
-    if (id.length === 11 && !streams.includes(id)) {
-      const updated = [id, ...streams];
+    // ভিডিও আইডি ১১ অক্ষরের হলে সেটি যোগ হবে
+    if (id.length === 11) {
+      // একই ভিডিও বারবার দেখানোর জন্য একটি ইউনিক কি (Unique Key) তৈরি করছি
+      const newStream = {
+        uniqueId: id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+        videoId: id
+      };
+      
+      const updated = [newStream, ...streams];
       setStreams(updated);
-      localStorage.setItem('_streams_v2', JSON.stringify(updated));
+      localStorage.setItem('_streams_v3', JSON.stringify(updated));
       setInput('');
     }
   };
 
-  const removeStream = (id: string) => {
-    const updated = streams.filter(s => s !== id);
+  const removeStream = (uniqueId: string) => {
+    const updated = streams.filter(s => s.uniqueId !== uniqueId);
     setStreams(updated);
-    localStorage.setItem('_streams_v2', JSON.stringify(updated));
+    localStorage.setItem('_streams_v3', JSON.stringify(updated));
   };
 
   return (
@@ -52,7 +61,7 @@ export default function LiveMatrix() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addStream()}
-              placeholder="Paste YouTube Link or Video ID..."
+              placeholder="Paste YouTube Link or Video ID (Same link allowed)..."
               className="w-full bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all placeholder:text-zinc-600 text-sm"
             />
             <button 
@@ -64,7 +73,7 @@ export default function LiveMatrix() {
           </div>
 
           <button 
-            onClick={() => {if(confirm('Clear all?')) setStreams([]); localStorage.clear();}}
+            onClick={() => {if(confirm('Clear all?')) { setStreams([]); localStorage.removeItem('_streams_v3'); }}}
             className="text-zinc-500 hover:text-red-500 text-xs font-mono uppercase tracking-widest transition-colors"
           >
             Reset_System
@@ -72,12 +81,12 @@ export default function LiveMatrix() {
         </div>
       </header>
 
-      {/* ভিডিও ম্যাট্রিক্স */}
+      {/* ভিডিও ম্যাট্রিক্স গ্রিড */}
       <main className="p-2 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1.5">
-        {streams.map((id) => (
-          <div key={id} className="group relative aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 hover:border-blue-500/50 transition-all shadow-xl shadow-black">
+        {streams.map((stream) => (
+          <div key={stream.uniqueId} className="group relative aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 hover:border-blue-500/50 transition-all shadow-xl shadow-black">
             <iframe
-              src={`https://www.youtube.com/embed/${id}?autoplay=1&mute=1&modestbranding=1&rel=0&iv_load_policy=3`}
+              src={`https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=1&modestbranding=1&rel=0`}
               className="w-full h-full"
               allow="autoplay; encrypted-media"
               allowFullScreen
@@ -85,7 +94,7 @@ export default function LiveMatrix() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
             <button 
-              onClick={() => removeStream(id)}
+              onClick={() => removeStream(stream.uniqueId)}
               className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 shadow-lg"
             >
               <Trash2 size={14} />
