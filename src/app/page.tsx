@@ -1,19 +1,19 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Monitor, LayoutPanelLeft } from 'lucide-react';
+import { Plus, Trash2, Monitor, LayoutPanelLeft, Volume2, VolumeX } from 'lucide-react';
 
 export default function LiveMatrix() {
   const [streams, setStreams] = useState<{uniqueId: string, videoId: string}[]>([]);
   const [input, setInput] = useState('');
+  const [isMuted, setIsMuted] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem('_streams_v4');
+    const saved = localStorage.getItem('_streams_v5');
     if (saved) setStreams(JSON.parse(saved));
   }, []);
 
   const addStream = () => {
     let id = input.trim();
-    // YouTube URL/Shorts থেকে ID বের করার উন্নত রেজেক্স
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
     const match = id.match(regex);
     if (match) id = match[1];
@@ -23,18 +23,21 @@ export default function LiveMatrix() {
         uniqueId: id + '-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
         videoId: id
       };
-      
       const updated = [newStream, ...streams];
       setStreams(updated);
-      localStorage.setItem('_streams_v4', JSON.stringify(updated));
-      // ইনপুট বক্স খালি করছি না যাতে আপনি চাইলে আবার সাথে সাথে ক্লিক করে আরেকটা যোগ করতে পারেন
+      localStorage.setItem('_streams_v5', JSON.stringify(updated));
     }
   };
 
   const removeStream = (uniqueId: string) => {
     const updated = streams.filter(s => s.uniqueId !== uniqueId);
     setStreams(updated);
-    localStorage.setItem('_streams_v4', JSON.stringify(updated));
+    localStorage.setItem('_streams_v5', JSON.stringify(updated));
+  };
+
+  const toggleMasterMute = () => {
+    setIsMuted(!isMuted);
+    // সাউন্ড পরিবর্তন করলে আইফ্রেমগুলো রিলোড হবে নতুন প্যারামিটার সহ
   };
 
   return (
@@ -42,7 +45,7 @@ export default function LiveMatrix() {
       <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-zinc-800 p-4 shadow-2xl">
         <div className="max-w-[1800px] mx-auto flex flex-col md:flex-row gap-6 items-center">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg shadow-lg shadow-blue-900/40">
+            <div className="p-2 bg-blue-600 rounded-lg shadow-lg">
               <Monitor size={24} className="text-white" />
             </div>
             <div>
@@ -51,37 +54,48 @@ export default function LiveMatrix() {
             </div>
           </div>
 
-          <div className="flex-1 flex gap-2 w-full max-w-3xl">
+          <div className="flex-1 flex gap-2 w-full max-w-2xl">
             <input 
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addStream()}
-              placeholder="Paste YouTube/Shorts link here..."
-              className="w-full bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm"
+              placeholder="Paste YouTube/Shorts link..."
+              className="w-full bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
             />
             <button 
               onClick={addStream}
-              className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-900/20"
+              className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95"
             >
-              <Plus size={18} /> <span>ADD VIDEO</span>
+              <Plus size={18} /> <span>ADD</span>
             </button>
           </div>
 
-          <button 
-            onClick={() => {if(confirm('Clear all?')) { setStreams([]); localStorage.removeItem('_streams_v4'); }}}
-            className="text-zinc-500 hover:text-red-500 text-xs font-mono uppercase transition-colors"
-          >
-            Reset_System
-          </button>
+          <div className="flex items-center gap-4">
+            {/* সাউন্ড কন্ট্রোল বাটন */}
+            <button 
+              onClick={toggleMasterMute}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all ${isMuted ? 'bg-zinc-800 text-zinc-400' : 'bg-green-600 text-white shadow-lg shadow-green-900/20'}`}
+            >
+              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              <span className="text-xs uppercase">{isMuted ? 'Unmute All' : 'Muted All'}</span>
+            </button>
+
+            <button 
+              onClick={() => {if(confirm('Clear all?')) { setStreams([]); localStorage.removeItem('_streams_v5'); }}}
+              className="text-zinc-500 hover:text-red-500 text-xs font-mono uppercase transition-colors"
+            >
+              Reset
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="p-2 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1.5">
         {streams.map((stream) => (
-          <div key={stream.uniqueId} className="group relative aspect-[9/16] sm:aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 hover:border-blue-500/50 transition-all shadow-xl shadow-black">
+          <div key={stream.uniqueId} className="group relative aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 hover:border-blue-500/50 transition-all shadow-xl shadow-black">
             <iframe
-              // autoplay=1 (অটো প্লে), mute=1 (মিউট না করলে অটো প্লে হবে না), loop=1 (বারবার চলবে), playlist=ID (লুপের জন্য দরকারি)
-              src={`https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=1&loop=1&playlist=${stream.videoId}&modestbranding=1&rel=0`}
+              // mute=${isMuted ? 1 : 0} অংশটি সাউন্ড কন্ট্রোল করছে
+              src={`https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&loop=1&playlist=${stream.videoId}&modestbranding=1&rel=0`}
               className="w-full h-full"
               allow="autoplay; encrypted-media"
               allowFullScreen
@@ -94,13 +108,6 @@ export default function LiveMatrix() {
             </button>
           </div>
         ))}
-
-        {streams.length === 0 && (
-          <div className="col-span-full h-[60vh] flex flex-col items-center justify-center text-zinc-600">
-            <LayoutPanelLeft size={64} strokeWidth={1} className="mb-4 opacity-20" />
-            <p className="font-mono text-sm uppercase tracking-[0.2em]">Ready for Action</p>
-          </div>
-        )}
       </main>
     </div>
   );
