@@ -44,7 +44,6 @@ export default function LiveMatrix() {
     
     if (match) {
       const id = match[1];
-      // এপিআই থেকে ডাটা আনা
       const videoData = await fetchVideoData(url);
 
       const newStream: Stream = {
@@ -122,39 +121,58 @@ export default function LiveMatrix() {
         </div>
       </header>
 
-      <main className="p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-        {streams.map((stream) => (
-          <div key={stream.uniqueId} className="group relative bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-blue-500/50 transition-all">
-            <div className="aspect-video relative">
-              <iframe
-                src={`https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&modestbranding=1&rel=0`}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-              />
-              <button 
-                onClick={() => removeStream(stream.uniqueId)}
-                className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-            
-            {/* ভিউ কাউন্ট সেকশন - যা আপনি চেয়েছিলেন */}
-            <div className="p-2 bg-black/40 backdrop-blur-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-blue-400">
-                  <Eye size={12} />
-                  <span className="text-[11px] font-bold font-mono">
-                    {Number(stream.viewCount).toLocaleString()} Views
-                  </span>
-                </div>
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="Live Tracking" />
+      <main className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+        {streams.map((stream) => {
+          // ভিউ সংখ্যা ১০০০ (1k) এর বেশি কি না চেক করা
+          const isHighViews = Number(stream.viewCount) >= 1000;
+
+          return (
+            <div 
+              key={stream.uniqueId} 
+              className={`group relative bg-zinc-900 rounded-xl overflow-hidden border-2 transition-all duration-500 ${
+                isHighViews 
+                  ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]' 
+                  : 'border-zinc-800 hover:border-blue-500/50'
+              }`}
+            >
+              <div className="aspect-video relative">
+                <iframe
+                  src={`https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&modestbranding=1&rel=0&playlist=${stream.videoId}&loop=1`}
+                  className="w-full h-full"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                />
+                <button 
+                  onClick={() => removeStream(stream.uniqueId)}
+                  className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-              <h3 className="text-[10px] text-zinc-500 truncate mt-1 uppercase font-medium">{stream.title}</h3>
+              
+              <div className={`p-2 transition-colors duration-500 ${isHighViews ? 'bg-yellow-500/10' : 'bg-black/40'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Eye size={12} className={isHighViews ? 'text-yellow-500' : 'text-blue-400'} />
+                    <span className={`text-[11px] font-bold font-mono ${isHighViews ? 'text-yellow-500' : 'text-blue-400'}`}>
+                      {Number(stream.viewCount).toLocaleString()} Views
+                    </span>
+                  </div>
+                  {isHighViews ? (
+                    <span className="text-[9px] bg-yellow-500 text-black px-1 rounded font-black animate-pulse">
+                      HOT
+                    </span>
+                  ) : (
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                </div>
+                <h3 className={`text-[10px] truncate mt-1 uppercase font-medium ${isHighViews ? 'text-yellow-200/70' : 'text-zinc-500'}`}>
+                  {stream.title}
+                </h3>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </main>
     </div>
   );
