@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Monitor, Volume2, VolumeX, LogIn, LogOut, Eye } from 'lucide-react';
+import { Plus, Trash2, Monitor, Volume2, VolumeX, LogOut, Eye } from 'lucide-react';
 import { signIn, signOut, useSession } from "next-auth/react";
 import MatrixRain from '@/components/MatrixRain';
 
@@ -9,7 +9,7 @@ interface Stream {
   videoId: string;
   title?: string;
   viewCount?: string;
-  lastUpdated?: number; // ভিউ বাড়লে গ্লো দেখানোর জন্য
+  lastUpdated?: number; 
 }
 
 export default function LiveMatrix() {
@@ -21,18 +21,24 @@ export default function LiveMatrix() {
   // লোকাল স্টোরেজ থেকে ডাটা লোড করা
   useEffect(() => {
     const saved = localStorage.getItem('_streams_v5');
-    if (saved) setStreams(JSON.parse(saved));
+    if (saved) {
+      try {
+        setStreams(JSON.parse(saved));
+      } catch (e) {
+        console.error("Storage parse error", e);
+      }
+    }
   }, []);
 
   // এপিআই থেকে ডাটা আনার ফাংশন
   const fetchVideoData = async (videoId: string) => {
     try {
-      const url = `https://www.youtube.com/watch?v=${videoId}`;
       const res = await fetch('/api/youtube', {
         method: 'POST',
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ videoId }), // ভিডিও আইডি পাঠানো হচ্ছে
         headers: { 'Content-Type': 'application/json' }
       });
+      if (!res.ok) return null;
       return await res.json();
     } catch (error) {
       console.error("Fetch error:", error);
@@ -50,8 +56,8 @@ export default function LiveMatrix() {
         return { 
           ...stream, 
           viewCount: newData.viewCount, 
-          title: newData.title,
-          lastUpdated: Date.now() // নতুন ভিউ আসলে গ্লো শুরু হবে
+          title: newData.title || stream.title,
+          lastUpdated: Date.now() 
         };
       }
       return stream;
@@ -63,18 +69,21 @@ export default function LiveMatrix() {
 
   // ৫ মিনিটের অটো-রিফ্রেশ টাইমার
   useEffect(() => {
-    const interval = setInterval(refreshAllViews, 5 * 60 * 1000); // ৫ মিনিট
+    const interval = setInterval(refreshAllViews, 5 * 60 * 1000); 
     return () => clearInterval(interval);
   }, [refreshAllViews]);
 
   const addStream = async () => {
     let url = input.trim();
+    if (!url) return;
+
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
     const match = url.match(regex);
     
     if (match) {
       const id = match[1];
       const videoData = await fetchVideoData(id);
+      
       const newStream: Stream = {
         uniqueId: id + '-' + Date.now(),
         videoId: id,
@@ -82,6 +91,7 @@ export default function LiveMatrix() {
         viewCount: videoData?.viewCount || '0',
         lastUpdated: Date.now()
       };
+      
       const updated = [newStream, ...streams];
       setStreams(updated);
       localStorage.setItem('_streams_v5', JSON.stringify(updated));
@@ -97,7 +107,6 @@ export default function LiveMatrix() {
 
   return (
     <div className="relative min-h-screen bg-[#050505] text-zinc-200 font-sans overflow-x-hidden">
-      {/* ম্যাট্রিক্স রেইন ব্যাকগ্রাউন্ড */}
       <MatrixRain />
 
       <header className="sticky top-0 z-50 bg-black/60 backdrop-blur-md border-b border-zinc-800 p-4 shadow-2xl">
@@ -130,10 +139,18 @@ export default function LiveMatrix() {
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               <span className="text-xs uppercase">{isMuted ? 'Muted' : 'Live'}</span>
             </button>
+            
             {!session ? (
               <button onClick={() => signIn('google')} className="bg-white text-black px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-zinc-200 transition-colors">Login</button>
             ) : (
-              <button onClick={() => signOut()} className="text-zinc-500 hover:text-red-500 transition-colors"><LogOut size={18} /></button>
+              <div className="flex items-center gap-3">
+                {session.user?.image && (
+                  <img src={session.user.image} alt="User" className="w-8 h-8 rounded-full border border-zinc-700" />
+                )}
+                <button onClick={() => signOut()} className="text-zinc-500 hover:text-red-500 transition-colors">
+                  <LogOut size={18} />
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -142,7 +159,7 @@ export default function LiveMatrix() {
       <main className="relative z-10 p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
         {streams.map((stream) => {
           const isHighViews = Number(stream.viewCount) >= 1000;
-          const isUpdating = stream.lastUpdated && (Date.now() - stream.lastUpdated < 5000);
+          const isUpdating = stream.lastUpdated && (Date.now() - stream.lastUpdated < 10000); // গ্লো ১০ সেকেন্ড থাকবে
 
           return (
             <div 
