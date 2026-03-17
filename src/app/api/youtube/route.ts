@@ -3,35 +3,32 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const { url } = await req.json();
-    
-    // ইউটিউব লিঙ্ক থেকে আইডি বের করার লজিক
-    const videoIdMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([^?&"'>]+)/);
+    const videoIdMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
     const videoId = videoIdMatch ? videoIdMatch[1] : null;
 
-    if (!videoId) {
-      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
-    }
+    if (!videoId) return NextResponse.json({ title: 'Invalid Link', viewCount: '0' });
 
-    // Vercel-এ YOUTUBE_API_KEY নামে এটি সেভ করতে হবে
-    const apiKey = process.env.YOUTUBE_API_KEY; 
+    const apiKey = process.env.YOUTUBE_API_KEY;
     const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
-
-    const res = await fetch(apiUrl);
+    
+    // গুগল কনসোলে দেওয়া Referer হুবহু এখানে পাঠাতে হবে
+    const res = await fetch(apiUrl, {
+      headers: {
+        'Referer': 'https://mdmilonislamashik-youtube-pro.vercel.app/',
+      }
+    });
+    
     const data = await res.json();
 
-    if (!data.items || data.items.length === 0) {
-      return NextResponse.json({ error: 'Video not found' }, { status: 404 });
+    if (data.items && data.items.length > 0) {
+      return NextResponse.json({
+        title: data.items[0].snippet.title,
+        viewCount: data.items[0].statistics.viewCount,
+      });
     }
 
-    const video = data.items[0];
-    return NextResponse.json({
-      id: videoId,
-      title: video.snippet.title,
-      thumbnail: video.snippet.thumbnails.high.url,
-      viewCount: video.statistics.viewCount, // ভিউ কাউন্ট ডাটা
-      likeCount: video.statistics.likeCount,
-    });
+    return NextResponse.json({ title: 'Video Private/Not Found', viewCount: '0' });
   } catch (error) {
-    return NextResponse.json({ error: 'Server Error' }, { status: 500 });
+    return NextResponse.json({ title: 'Server Error', viewCount: '0' });
   }
 }
