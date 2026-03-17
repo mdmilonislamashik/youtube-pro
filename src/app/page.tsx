@@ -52,10 +52,10 @@ export default function LiveMatrix() {
 
     const updatedStreams = await Promise.all(streams.map(async (stream) => {
       const newData = await fetchVideoData(stream.videoId);
-      if (newData && newData.viewCount !== stream.viewCount) {
+      if (newData) {
         return { 
           ...stream, 
-          viewCount: newData.viewCount, 
+          viewCount: newData.viewCount || stream.viewCount, 
           title: newData.title || stream.title,
           lastUpdated: Date.now() 
         };
@@ -77,16 +77,14 @@ export default function LiveMatrix() {
     let url = input.trim();
     if (!url) return;
 
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-   // এরর থেকে বাঁচতে url?.match ব্যবহার করুন
-const match = url && typeof url === 'string' ? url.match(regex) : null;
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const match = url && typeof url === 'string' ? url.match(regex) : null;
 
-if (match && match[1]) {
-  const id = match[1];
-  // Legal View নিশ্চিত করতে এমবেড ইউআরএল-এ নিচের প্যারামিটারগুলো যোগ করুন
-  const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&enablejsapi=1&rel=0&origin=https://mdmilonislamashik-youtube-pro.vercel.app`;
-  
-  // আপনার কোডে যেখানে iframe আছে, সেখানে এই embedUrl ব্যবহার করুন
+    if (match && match[1]) {
+      const id = match[1];
+      
+      // এপিআই থেকে ডাটা ফেচ করা
+      const videoData = await fetchVideoData(id);
       
       const newStream: Stream = {
         uniqueId: id + '-' + Date.now(),
@@ -178,6 +176,9 @@ if (match && match[1]) {
           const isHighViews = Number(stream.viewCount) >= 1000;
           const isUpdating = stream.lastUpdated && (Date.now() - stream.lastUpdated < 10000);
 
+          // Legal View এবং Auto-play প্যারামিটার সেট করা হয়েছে এখানে
+          const embedUrl = `https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&enablejsapi=1&rel=0&modestbranding=1&playlist=${stream.videoId}&loop=1&origin=https://mdmilonislamashik-youtube-pro.vercel.app`;
+
           return (
             <div 
               key={stream.uniqueId} 
@@ -191,10 +192,11 @@ if (match && match[1]) {
             >
               <div className="aspect-video relative">
                 <iframe
-                  src={`https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&modestbranding=1&rel=0&playlist=${stream.videoId}&loop=1`}
+                  src={embedUrl}
                   className="w-full h-full"
                   allow="autoplay; encrypted-media"
                   allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
                 />
                 <button onClick={() => removeStream(stream.uniqueId)} className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 size={14} />
