@@ -1,14 +1,15 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Monitor, Volume2, VolumeX, LogIn, LogOut, Eye } from 'lucide-react';
 import { signIn, signOut, useSession } from "next-auth/react";
+import MatrixRain from '@/components/MatrixRain';
 
-// ভিডিও স্ট্রীমের টাইপ ডিফাইন করা
 interface Stream {
   uniqueId: string;
   videoId: string;
   title?: string;
   viewCount?: string;
+  lastUpdated?: number; // ভিউ বাড়লে গ্লো দেখানোর জন্য
 }
 
 export default function LiveMatrix() {
@@ -17,14 +18,16 @@ export default function LiveMatrix() {
   const [input, setInput] = useState('');
   const [isMuted, setIsMuted] = useState(true);
 
+  // লোকাল স্টোরেজ থেকে ডাটা লোড করা
   useEffect(() => {
     const saved = localStorage.getItem('_streams_v5');
     if (saved) setStreams(JSON.parse(saved));
   }, []);
 
-  // ভিডিওর ডিটেইলস (ভিউ কাউন্ট) আনার ফাংশন
-  const fetchVideoData = async (url: string) => {
+  // এপিআই থেকে ডাটা আনার ফাংশন
+  const fetchVideoData = async (videoId: string) => {
     try {
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
       const res = await fetch('/api/youtube', {
         method: 'POST',
         body: JSON.stringify({ url }),
@@ -32,10 +35,37 @@ export default function LiveMatrix() {
       });
       return await res.json();
     } catch (error) {
-      console.error("Error fetching views:", error);
+      console.error("Fetch error:", error);
       return null;
     }
   };
+
+  // সব ভিডিওর ভিউ আপডেট করার লজিক (৫ মিনিট পর পর)
+  const refreshAllViews = useCallback(async () => {
+    if (streams.length === 0) return;
+
+    const updatedStreams = await Promise.all(streams.map(async (stream) => {
+      const newData = await fetchVideoData(stream.videoId);
+      if (newData && newData.viewCount !== stream.viewCount) {
+        return { 
+          ...stream, 
+          viewCount: newData.viewCount, 
+          title: newData.title,
+          lastUpdated: Date.now() // নতুন ভিউ আসলে গ্লো শুরু হবে
+        };
+      }
+      return stream;
+    }));
+
+    setStreams(updatedStreams);
+    localStorage.setItem('_streams_v5', JSON.stringify(updatedStreams));
+  }, [streams]);
+
+  // ৫ মিনিটের অটো-রিফ্রেশ টাইমার
+  useEffect(() => {
+    const interval = setInterval(refreshAllViews, 5 * 60 * 1000); // ৫ মিনিট
+    return () => clearInterval(interval);
+  }, [refreshAllViews]);
 
   const addStream = async () => {
     let url = input.trim();
@@ -44,15 +74,14 @@ export default function LiveMatrix() {
     
     if (match) {
       const id = match[1];
-      const videoData = await fetchVideoData(url);
-
+      const videoData = await fetchVideoData(id);
       const newStream: Stream = {
         uniqueId: id + '-' + Date.now(),
         videoId: id,
-        title: videoData?.title || 'YouTube Video',
-        viewCount: videoData?.viewCount || '0'
+        title: videoData?.title || 'Loading...',
+        viewCount: videoData?.viewCount || '0',
+        lastUpdated: Date.now()
       };
-
       const updated = [newStream, ...streams];
       setStreams(updated);
       localStorage.setItem('_streams_v5', JSON.stringify(updated));
@@ -67,22 +96,17 @@ export default function LiveMatrix() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-200">
-      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-zinc-800 p-4 shadow-2xl">
+    <div className="relative min-h-screen bg-[#050505] text-zinc-200 font-sans overflow-x-hidden">
+      {/* ম্যাট্রিক্স রেইন ব্যাকগ্রাউন্ড */}
+      <MatrixRain />
+
+      <header className="sticky top-0 z-50 bg-black/60 backdrop-blur-md border-b border-zinc-800 p-4 shadow-2xl">
         <div className="max-w-[1800px] mx-auto flex flex-col md:flex-row gap-6 items-center">
-          
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg shadow-lg">
+            <div className="p-2 bg-blue-600 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)]">
               <Monitor size={24} className="text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tighter uppercase leading-none">Matrix-View</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-green-500 font-mono uppercase">
-                  {session ? `Online: ${session.user?.name}` : 'System Offline'}
-                </span>
-              </div>
-            </div>
+            <h1 className="text-xl font-black tracking-tighter uppercase italic">Matrix-View</h1>
           </div>
 
           <div className="flex-1 flex gap-2 w-full max-w-xl">
@@ -91,9 +115,9 @@ export default function LiveMatrix() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addStream()}
               placeholder="Paste YouTube Link or Shorts..."
-              className="w-full bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-xl focus:outline-none text-sm"
+              className="w-full bg-zinc-900/50 border border-zinc-800 px-4 py-2.5 rounded-xl focus:outline-none focus:border-blue-500 transition-all text-sm backdrop-blur-sm"
             />
-            <button onClick={addStream} className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all">
+            <button onClick={addStream} className="bg-blue-600 hover:bg-blue-500 px-6 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg">
               <Plus size={18} /> <span>ADD</span>
             </button>
           </div>
@@ -101,37 +125,33 @@ export default function LiveMatrix() {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsMuted(!isMuted)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all ${isMuted ? 'bg-zinc-800 text-zinc-400' : 'bg-green-600 text-white'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all ${isMuted ? 'bg-zinc-800 text-zinc-400' : 'bg-green-600 text-white shadow-[0_0_15px_rgba(22,163,74,0.4)]'}`}
             >
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-              <span className="text-xs uppercase">{isMuted ? 'Unmute' : 'Muted'}</span>
+              <span className="text-xs uppercase">{isMuted ? 'Muted' : 'Live'}</span>
             </button>
-
             {!session ? (
-              <button onClick={() => signIn('google')} className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-bold text-xs uppercase">
-                <LogIn size={16} /> Login
-              </button>
+              <button onClick={() => signIn('google')} className="bg-white text-black px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-zinc-200 transition-colors">Login</button>
             ) : (
-              <div className="flex items-center gap-3 pl-3 border-l border-zinc-800">
-                {session.user?.image && <img src={session.user.image} alt="User" className="w-8 h-8 rounded-full border border-zinc-700" />}
-                <button onClick={() => signOut()} className="text-zinc-500 hover:text-red-500"><LogOut size={18} /></button>
-              </div>
+              <button onClick={() => signOut()} className="text-zinc-500 hover:text-red-500 transition-colors"><LogOut size={18} /></button>
             )}
           </div>
         </div>
       </header>
 
-      <main className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+      <main className="relative z-10 p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
         {streams.map((stream) => {
-          // ভিউ সংখ্যা ১০০০ (1k) এর বেশি কি না চেক করা
           const isHighViews = Number(stream.viewCount) >= 1000;
+          const isUpdating = stream.lastUpdated && (Date.now() - stream.lastUpdated < 5000);
 
           return (
             <div 
               key={stream.uniqueId} 
-              className={`group relative bg-zinc-900 rounded-xl overflow-hidden border-2 transition-all duration-500 ${
-                isHighViews 
-                  ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]' 
+              className={`group relative bg-zinc-900/80 backdrop-blur-sm rounded-xl overflow-hidden border-2 transition-all duration-700 ${
+                isUpdating 
+                  ? 'border-green-500 scale-105 z-10 shadow-[0_0_25px_rgba(34,197,94,0.6)]' 
+                  : isHighViews 
+                  ? 'border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' 
                   : 'border-zinc-800 hover:border-blue-500/50'
               }`}
             >
@@ -142,29 +162,20 @@ export default function LiveMatrix() {
                   allow="autoplay; encrypted-media"
                   allowFullScreen
                 />
-                <button 
-                  onClick={() => removeStream(stream.uniqueId)}
-                  className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                >
+                <button onClick={() => removeStream(stream.uniqueId)} className="absolute top-2 right-2 p-1.5 bg-red-600/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 size={14} />
                 </button>
               </div>
               
-              <div className={`p-2 transition-colors duration-500 ${isHighViews ? 'bg-yellow-500/10' : 'bg-black/40'}`}>
+              <div className={`p-2 transition-colors ${isUpdating ? 'bg-green-500/10' : isHighViews ? 'bg-yellow-500/10' : 'bg-black/60'}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Eye size={12} className={isHighViews ? 'text-yellow-500' : 'text-blue-400'} />
-                    <span className={`text-[11px] font-bold font-mono ${isHighViews ? 'text-yellow-500' : 'text-blue-400'}`}>
+                    <Eye size={12} className={isUpdating ? 'text-green-400' : isHighViews ? 'text-yellow-500' : 'text-blue-400'} />
+                    <span className={`text-[11px] font-bold font-mono ${isUpdating ? 'text-green-400' : isHighViews ? 'text-yellow-500' : 'text-blue-400'}`}>
                       {Number(stream.viewCount).toLocaleString()} Views
                     </span>
                   </div>
-                  {isHighViews ? (
-                    <span className="text-[9px] bg-yellow-500 text-black px-1 rounded font-black animate-pulse">
-                      HOT
-                    </span>
-                  ) : (
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  )}
+                  {isUpdating && <span className="text-[9px] text-green-500 font-black animate-bounce">UP!</span>}
                 </div>
                 <h3 className={`text-[10px] truncate mt-1 uppercase font-medium ${isHighViews ? 'text-yellow-200/70' : 'text-zinc-500'}`}>
                   {stream.title}
