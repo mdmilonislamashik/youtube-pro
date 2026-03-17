@@ -78,11 +78,15 @@ export default function LiveMatrix() {
     if (!url) return;
 
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = url.match(regex);
-    
-    if (match) {
-      const id = match[1];
-      const videoData = await fetchVideoData(id);
+   // এরর থেকে বাঁচতে url?.match ব্যবহার করুন
+const match = url && typeof url === 'string' ? url.match(regex) : null;
+
+if (match && match[1]) {
+  const id = match[1];
+  // Legal View নিশ্চিত করতে এমবেড ইউআরএল-এ নিচের প্যারামিটারগুলো যোগ করুন
+  const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&enablejsapi=1&rel=0&origin=https://mdmilonislamashik-youtube-pro.vercel.app`;
+  
+  // আপনার কোডে যেখানে iframe আছে, সেখানে এই embedUrl ব্যবহার করুন
       
       const newStream: Stream = {
         uniqueId: id + '-' + Date.now(),
