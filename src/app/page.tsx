@@ -35,7 +35,7 @@ export default function LiveMatrix() {
     try {
       const res = await fetch('/api/youtube', {
         method: 'POST',
-        body: JSON.stringify({ videoId }), // ভিডিও আইডি পাঠানো হচ্ছে
+        body: JSON.stringify({ videoId }),
         headers: { 'Content-Type': 'application/json' }
       });
       if (!res.ok) return null;
@@ -141,14 +141,27 @@ export default function LiveMatrix() {
             </button>
             
             {!session ? (
-              <button onClick={() => signIn('google')} className="bg-white text-black px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-zinc-200 transition-colors">Login</button>
+              <button onClick={() => signIn('google')} className="bg-white text-black px-4 py-2 rounded-lg font-bold text-xs uppercase hover:bg-zinc-200 transition-colors">
+                Login
+              </button>
             ) : (
-              <div className="flex items-center gap-3">
-                {session.user?.image && (
-                  <img src={session.user.image} alt="User" className="w-8 h-8 rounded-full border border-zinc-700" />
+              <div className="flex items-center gap-3 bg-zinc-900/50 p-1 pr-3 rounded-full border border-zinc-800 backdrop-blur-md">
+                {session.user?.image ? (
+                  <img 
+                    src={session.user.image} 
+                    alt="Profile" 
+                    className="w-8 h-8 rounded-full border border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold">
+                    {session.user?.name?.charAt(0) || 'U'}
+                  </div>
                 )}
-                <button onClick={() => signOut()} className="text-zinc-500 hover:text-red-500 transition-colors">
-                  <LogOut size={18} />
+                <span className="text-[10px] font-bold uppercase hidden sm:block tracking-widest text-zinc-300">
+                  {session.user?.name?.split(' ')[0]}
+                </span>
+                <button onClick={() => signOut()} className="text-zinc-500 hover:text-red-500 transition-colors ml-1">
+                  <LogOut size={16} />
                 </button>
               </div>
             )}
@@ -159,7 +172,7 @@ export default function LiveMatrix() {
       <main className="relative z-10 p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
         {streams.map((stream) => {
           const isHighViews = Number(stream.viewCount) >= 1000;
-          const isUpdating = stream.lastUpdated && (Date.now() - stream.lastUpdated < 10000); // গ্লো ১০ সেকেন্ড থাকবে
+          const isUpdating = stream.lastUpdated && (Date.now() - stream.lastUpdated < 10000);
 
           return (
             <div 
