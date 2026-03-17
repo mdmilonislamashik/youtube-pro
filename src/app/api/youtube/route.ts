@@ -11,9 +11,9 @@ export async function POST(req: Request) {
     const apiKey = process.env.YOUTUBE_API_KEY;
     const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
     
-    // গুগল কনসোলে দেওয়া Referer হুবহু এখানে পাঠাতে হবে
     const res = await fetch(apiUrl, {
       headers: {
+        // আপনার গুগল কনসোলের ডোমেইনের সাথে এটি এখন হুবহু মিলবে
         'Referer': 'https://mdmilonislamashik-youtube-pro.vercel.app/',
       }
     });
