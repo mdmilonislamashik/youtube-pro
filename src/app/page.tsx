@@ -30,23 +30,23 @@ export default function LiveMatrix() {
     }
   }, []);
 
-  // এপিআই থেকে ডাটা আনার ফাংশন
+  // এপিআই থেকে ডাটা আনার ফাংশন (Updated for videoId)
   const fetchVideoData = async (videoId: string) => {
     try {
       const res = await fetch('/api/youtube', {
         method: 'POST',
-        body: JSON.stringify({ videoId }),
+        body: JSON.stringify({ videoId }), // Backend-e videoId pathano hochhe
         headers: { 'Content-Type': 'application/json' }
       });
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error("API Error");
       return await res.json();
     } catch (error) {
       console.error("Fetch error:", error);
-      return null;
+      return { title: "Error Loading", viewCount: "0" };
     }
   };
 
-  // সব ভিডিওর ভিউ আপডেট করার লজিক (৫ মিনিট পর পর)
+  // সব ভিডিওর ভিউ আপডেট করার লজিক
   const refreshAllViews = useCallback(async () => {
     if (streams.length === 0) return;
 
@@ -82,8 +82,6 @@ export default function LiveMatrix() {
 
     if (match && match[1]) {
       const id = match[1];
-      
-      // এপিআই থেকে ডাটা ফেচ করা
       const videoData = await fetchVideoData(id);
       
       const newStream: Stream = {
@@ -176,8 +174,9 @@ export default function LiveMatrix() {
           const isHighViews = Number(stream.viewCount) >= 1000;
           const isUpdating = stream.lastUpdated && (Date.now() - stream.lastUpdated < 10000);
 
-          // Legal View এবং Auto-play প্যারামিটার সেট করা হয়েছে এখানে
-          const embedUrl = `https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&enablejsapi=1&rel=0&modestbranding=1&playlist=${stream.videoId}&loop=1&origin=https://mdmilonislamashik-youtube-pro.vercel.app`;
+          // Origin dynamic kora hoyeche view count legal rakhar jonno
+          const originUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          const embedUrl = `https://www.youtube.com/embed/${stream.videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&enablejsapi=1&rel=0&modestbranding=1&playlist=${stream.videoId}&loop=1&origin=${originUrl}`;
 
           return (
             <div 
@@ -208,7 +207,7 @@ export default function LiveMatrix() {
                   <div className="flex items-center gap-1.5">
                     <Eye size={12} className={isUpdating ? 'text-green-400' : isHighViews ? 'text-yellow-500' : 'text-blue-400'} />
                     <span className={`text-[11px] font-bold font-mono ${isUpdating ? 'text-green-400' : isHighViews ? 'text-yellow-500' : 'text-blue-400'}`}>
-                      {Number(stream.viewCount).toLocaleString()} Views
+                      {(Number(stream.viewCount) || 0).toLocaleString()} Views
                     </span>
                   </div>
                   {isUpdating && <span className="text-[9px] text-green-500 font-black animate-bounce">UP!</span>}

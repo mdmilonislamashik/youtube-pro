@@ -2,33 +2,42 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { url } = await req.json();
+    const body = await req.json();
     
-    // ইউটিউব আইডি বের করার জন্য সবচেয়ে শক্তিশালী Regex
-    const videoIdMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    const videoId = videoIdMatch ? videoIdMatch[1] : null;
+    // Frontend theke link (url) ba shorasori videoId - jekonota asle eita kaj korbe
+    let videoId = body.videoId;
+
+    if (body.url) {
+      const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+      const match = body.url.match(regex);
+      if (match) videoId = match[1];
+    }
 
     if (!videoId) {
-      return NextResponse.json({ title: 'Invalid Link', viewCount: '0' });
+      return NextResponse.json({ title: 'Invalid Video ID/Link', viewCount: '0' });
     }
 
     const apiKey = process.env.YOUTUBE_API_KEY;
     
-    // snippet এবং statistics দুইটাই কল করা হচ্ছে
+    // API Key na thakle error handle kora
+    if (!apiKey) {
+      console.error("YOUTUBE_API_KEY is missing in environment variables!");
+      return NextResponse.json({ title: 'API Key Missing', viewCount: '0' });
+    }
+
     const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
     
     const res = await fetch(apiUrl, {
       headers: {
-        // আপনার গুগল কনসোলে দেওয়া ডোমেইনটির সাথে হুবহু মিল থাকতে হবে
+        // Vercel domain-er sathe mil rekhe Referer set kora
         'Referer': 'https://mdmilonislamashik-youtube-pro.vercel.app/',
       },
-      // revalidate: 0 মানে হলো প্রতিবার তাজা ডাটা আসবে (ক্যাশ হবে না)
-      next: { revalidate: 0 } 
+      next: { revalidate: 0 } // Cache bondho rakhar jonno
     });
     
     const data = await res.json();
 
-    // ডাটা সাকসেসফুলি আসলে
+    // Data thikmoto asle return korbe
     if (data.items && data.items.length > 0) {
       const video = data.items[0];
       return NextResponse.json({
@@ -37,12 +46,13 @@ export async function POST(req: Request) {
       });
     }
 
-    // যদি এপিআই কোনো এরর দেয় তবে সার্ভার কনসোলে দেখাবে
+    // API error handle kora (jemon quota sesh hoye gele)
     if (data.error) {
-      console.error('YouTube API Backend Error:', data.error.message);
+      console.error('YouTube API Error:', data.error.message);
+      return NextResponse.json({ title: 'API Error/Limit', viewCount: '0' });
     }
 
-    return NextResponse.json({ title: 'Video Not Found/Private', viewCount: '0' });
+    return NextResponse.json({ title: 'Video Private/Not Found', viewCount: '0' });
 
   } catch (error) {
     console.error('Final Route Error:', error);
