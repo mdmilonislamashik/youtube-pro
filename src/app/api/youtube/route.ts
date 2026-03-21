@@ -4,7 +4,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     
-    // Frontend theke link (url) ba shorasori videoId - jekonota asle eita kaj korbe
+    // Frontend থেকে link (url) বা সরাসরি videoId - যেকোনোটা আসলে কাজ করবে
     let videoId = body.videoId;
 
     if (body.url) {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.YOUTUBE_API_KEY;
     
-    // API Key na thakle error handle kora
+    // API Key না থাকলে error handle করা
     if (!apiKey) {
       console.error("YOUTUBE_API_KEY is missing in environment variables!");
       return NextResponse.json({ title: 'API Key Missing', viewCount: '0' });
@@ -27,17 +27,17 @@ export async function POST(req: Request) {
 
     const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
     
+    // cache: 'no-store' ব্যবহার করা হয়েছে যাতে সবসময় লেটেস্ট ডাটা আসে
     const res = await fetch(apiUrl, {
       headers: {
-        // Vercel domain-er sathe mil rekhe Referer set kora
         'Referer': 'https://mdmilonislamashik-youtube-pro.vercel.app/',
       },
-      next: { revalidate: 0 } // Cache bondho rakhar jonno
+      cache: 'no-store' 
     });
     
     const data = await res.json();
 
-    // Data thikmoto asle return korbe
+    // Data ঠিকমতো আসলে return করবে
     if (data.items && data.items.length > 0) {
       const video = data.items[0];
       return NextResponse.json({
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // API error handle kora (jemon quota sesh hoye gele)
+    // API error handle করা (যেমন quota শেষ হয়ে গেলে)
     if (data.error) {
       console.error('YouTube API Error:', data.error.message);
       return NextResponse.json({ title: 'API Error/Limit', viewCount: '0' });
